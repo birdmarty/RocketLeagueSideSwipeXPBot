@@ -36,29 +36,50 @@ def detect_and_click_login():
         
         
 # Function to check if the Challenges button is glowing orange
+# Function to check if the Challenges button is glowing orange
 def is_challenges_glowing():
     try:
-        # Define the region where the Challenges button is expected to be
-        challenges_region = (1838, 1061, 2103 - 1838, 1149 - 1061)  # Adjust the coordinates as needed
+        # Load the Challenges image
+        challenges_img = cv2.imread("Challenges.png")
+        if challenges_img is None:
+            print("Error: Unable to load 'Challenges.png'")
+            return False
+        
+        # Take a screenshot of the screen
+        screen = pyautogui.screenshot()
+        screen_np = np.array(screen)
+        
+        # Search for the Challenges image in the screenshot
+        result = cv2.matchTemplate(screen_np, challenges_img, cv2.TM_CCOEFF_NORMED)
+        _, _, _, max_loc = cv2.minMaxLoc(result)
+        
+        # Define the region around the Challenges image
+        challenges_region = (
+            max_loc[0], max_loc[1], 
+            max_loc[0] + challenges_img.shape[1], 
+            max_loc[1] + challenges_img.shape[0]
+        )
         
         # Take a screenshot of the defined region
-        screen = pyautogui.screenshot(region=challenges_region)
-        screen_np = np.array(screen)
+        challenges_screen = pyautogui.screenshot(region=challenges_region)
+        challenges_screen_np = np.array(challenges_screen)
         
         # Define the RGB values of the glowing orange color
         orange_lower = np.array([200, 90, 0], dtype="uint8")
         orange_upper = np.array([255, 140, 30], dtype="uint8")
         
         # Mask the image to find pixels within the orange color range
-        mask = cv2.inRange(screen_np, orange_lower, orange_upper)
+        mask = cv2.inRange(challenges_screen_np, orange_lower, orange_upper)
         
         # Count the number of non-zero pixels in the mask
         num_orange_pixels = cv2.countNonZero(mask)
         
         # You can adjust the threshold as needed
         if num_orange_pixels > 1000:
+            print("challenges glowing")
             return True
         else:
+            print("challenges not glowing")
             return False
     except Exception as e:
         print(f"Error: {e}")
@@ -268,8 +289,9 @@ def waiting_for_match():
         cancel_button_blue_img = cv2.imread("cancel_button_blue.png", cv2.IMREAD_GRAYSCALE)
         play_button_img = cv2.imread("play_button.png", cv2.IMREAD_GRAYSCALE)
         find_match_button_img = cv2.imread("find_match_button.png", cv2.IMREAD_GRAYSCALE)
-        login_button_img = cv2.imread("Login.png", cv2.IMREAD_GRAYSCALE)  # Load the login button image
-        close_button_img = cv2.imread("Close.png", cv2.IMREAD_GRAYSCALE)  # Load the close button image
+        login_button_img = cv2.imread("Login.png", cv2.IMREAD_GRAYSCALE)
+        close_button_img = cv2.imread("Close.png", cv2.IMREAD_GRAYSCALE)
+        match_summary_img = cv2.imread("match_summary.png", cv2.IMREAD_GRAYSCALE)
         
         check_interval = 10  # Interval in seconds to check for play or find match button
         spam_interval = 1  # Interval in seconds for keyboard spamming
@@ -290,13 +312,26 @@ def waiting_for_match():
                 time.sleep(1)  # Wait for a moment after clicking close button
                 continue
                 
+            # Check for Match Summary button
+            result_match_summary = cv2.matchTemplate(screen_gray, match_summary_img, cv2.TM_CCOEFF_NORMED)
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result_match_summary)
+            if max_val > 0.6:
+                print("Match summary button found.")
+                # Click the Close button
+                match_summary_pos = ((max_loc[0] + match_summary_img.shape[1] // 2)-187, max_loc[1] + match_summary_img.shape[0] // 2)
+                pyautogui.click(match_summary_pos)
+                print("Successfully clicked the 'match summary' button.")
+                time.sleep(10)
+                continue
+                
             # Check for blue cancel button
             result_blue = cv2.matchTemplate(screen_gray, cancel_button_blue_img, cv2.TM_CCOEFF_NORMED)
             _, max_val_blue, _, _ = cv2.minMaxLoc(result_blue)
             if max_val_blue > 0.5:
                 print("Blue cancel button found.")
+                time.sleep(2)
+                check_challenges()
                 # Wait for 2 seconds before checking for blue cancel button again
-                time.sleep(6)
                 continue
                 
             # Check for login button
